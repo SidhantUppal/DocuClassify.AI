@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "wzFpY9CDUl08BAMHpkrAPgcOCLdN6bgX4MWC7w9f3NE=",
+  "Source": "DocumentClassifier.API",
+  "BasePath": "_content/DocumentClassifier.API",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

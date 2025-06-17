@@ -1,0 +1,3 @@
+﻿<Project>
+  <Import Project="..\build\DocumentClassifier.API.props" />
+</Project>
