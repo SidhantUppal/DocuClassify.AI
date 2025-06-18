@@ -310,4 +310,30 @@ public class DocumentsController : ControllerBase
 
         return Ok(results);
     }
+
+    /// <summary>
+    /// Downloads the original document file by its unique identifier.
+    /// </summary>
+    /// <param name="id">The unique identifier of the document.</param>
+    /// <returns>The file stream of the document.</returns>
+    [HttpGet("{id}/download")]
+    public async Task<IActionResult> DownloadDocument(Guid id)
+    {
+        try
+        {
+            var document = await _documentRepository.GetByIdAsync(id);
+            if (document == null || string.IsNullOrEmpty(document.FilePath) || !System.IO.File.Exists(document.FilePath))
+                return NotFound();
+
+            var stream = new FileStream(document.FilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var contentType = !string.IsNullOrEmpty(document.ContentType) ? document.ContentType : "application/octet-stream";
+            var fileName = document.FileName ?? $"document_{id}";
+            return File(stream, contentType, fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error downloading document {DocumentId}", id);
+            return StatusCode(500, "Internal server error");
+        }
+    }
 }

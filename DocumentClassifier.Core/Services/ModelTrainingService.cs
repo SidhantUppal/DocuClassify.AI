@@ -135,18 +135,22 @@ public class ModelTrainingService : IModelTrainingService
 
                 var trainingData = await trainingDataRepo.GetValidatedDataAsync();
 
-                // Get validated training data
-                //var trainingData = await _trainingDataRepository.GetValidatedDataAsync();
-
                 if (!trainingData.Any())
                 {
                     job.Status = "Failed";
                     job.ErrorMessage = "No validated training data available";
                     job.EndTime = DateTime.UtcNow;
+                    job.TotalDocuments = 0;
+                    job.ProcessedDocuments = 0;
+                    job.EstimatedTimeSeconds = null;
                     return;
                 }
 
                 job.Status = "Training";
+                job.TotalDocuments = trainingData.Count();
+                job.ProcessedDocuments = 0;
+                job.EstimatedTimeSeconds = null;
+                var startTime = DateTime.UtcNow;
 
                 // Prepare training data
                 var dataList = trainingData.Select(td => new DocumentInput
@@ -155,25 +159,27 @@ public class ModelTrainingService : IModelTrainingService
                     Label = td.Label
                 }).ToList();
 
+                // Simulate per-document progress (for demo, since ML.NET trains in batch)
+                for (int i = 0; i < dataList.Count; i++)
+                {
+                    // Simulate processing time per document
+                    await Task.Delay(200); // Simulate 200ms per document
+                    job.ProcessedDocuments = i + 1;
+                    var elapsed = (DateTime.UtcNow - startTime).TotalSeconds;
+                    var avgPerDoc = elapsed / (i + 1);
+                    job.EstimatedTimeSeconds = avgPerDoc * (dataList.Count - (i + 1));
+                }
+
                 var dataView = _mlContext.Data.LoadFromEnumerable(dataList);
-
-                // Split data
                 var splitData = _mlContext.Data.TrainTestSplit(dataView, testFraction: 0.2);
-
-                // Build training pipeline
                 var pipeline = _mlContext.Transforms.Conversion.MapValueToKey("Label")
                     .Append(_mlContext.Transforms.Text.FeaturizeText("Features", "Text"))
                     .Append(_mlContext.MulticlassClassification.Trainers.SdcaMaximumEntropy("Label", "Features"))
                     .Append(_mlContext.Transforms.Conversion.MapKeyToValue("PredictedLabel"));
 
-                // Train model
                 var model = pipeline.Fit(splitData.TrainSet);
-
-                // Evaluate model
                 var predictions = model.Transform(splitData.TestSet);
                 var metrics = _mlContext.MulticlassClassification.Evaluate(predictions);
-
-                // Save model
                 _mlContext.Model.Save(model, dataView.Schema, _modelPath);
 
                 // Update job status
@@ -186,6 +192,8 @@ public class ModelTrainingService : IModelTrainingService
                     Recall = metrics.MacroAccuracy,
                     F1Score = metrics.MacroAccuracy
                 };
+                job.ProcessedDocuments = job.TotalDocuments;
+                job.EstimatedTimeSeconds = null;
             }
         }
         catch (Exception ex)
@@ -194,6 +202,40 @@ public class ModelTrainingService : IModelTrainingService
             job.Status = "Failed";
             job.ErrorMessage = ex.Message;
             job.EndTime = DateTime.UtcNow;
+            job.EstimatedTimeSeconds = null;
+            job.ProcessedDocuments = job.TotalDocuments;
         }
     }
+
+    public string PredictDocumentType(string extractedText)
+    {
+        // Ensure the model exists
+        if (!File.Exists(_modelPath))
+            throw new FileNotFoundException("Trained model not found.", _modelPath);
+
+        // Load the model
+        ITransformer trainedModel;
+        using (var stream = new FileStream(_modelPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            trainedModel = _mlContext.Model.Load(stream, out var modelInputSchema);
+        }
+
+        // Create prediction engine
+        var predictionEngine = _mlContext.Model.CreatePredictionEngine<DocumentInput, DocumentPrediction>(trainedModel);
+
+        // Create input
+        var input = new DocumentInput { Text = extractedText };
+
+        // Predict
+        var prediction = predictionEngine.Predict(input);
+
+        return prediction.PredictedLabel;
+    }
+}
+
+public class DocumentPrediction
+{
+    [ColumnName("PredictedLabel")]
+    public string PredictedLabel { get; set; }
+    public float[] Score { get; set; }
 }

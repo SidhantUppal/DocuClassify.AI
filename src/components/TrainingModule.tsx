@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  GraduationCap, 
-  Upload, 
-  Plus, 
-  X, 
-  Play, 
+import {
+  GraduationCap,
+  Upload,
+  Plus,
+  X,
+  Play,
   BarChart3,
   CheckCircle,
   AlertTriangle,
@@ -34,6 +34,12 @@ interface ModelMetrics {
   f1Score: number;
 }
 
+interface TrainingProgress {
+  totalDocuments: number;
+  processedDocuments: number;
+  estimatedTimeSeconds: number | null;
+}
+
 export const TrainingModule: React.FC = () => {
   const [trainingData, setTrainingData] = useState<TrainingData[]>([]);
   const [newLabel, setNewLabel] = useState('');
@@ -45,6 +51,7 @@ export const TrainingModule: React.FC = () => {
   const [metrics, setMetrics] = useState<ModelMetrics | null>(null);
   const [uploading, setUploading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [progress, setProgress] = useState<TrainingProgress | null>(null);
 
   const documentTypes = [
     'Invoice', 'Resume', 'Contract', 'Purchase Order', 'Agreement', 'Report', 'Other'
@@ -53,14 +60,19 @@ export const TrainingModule: React.FC = () => {
   useEffect(() => {
     fetchTrainingData();
     fetchModelMetrics();
-    // Optionally, poll training status if jobId exists
     if (jobId) {
       const interval = setInterval(() => {
         getTrainingStatus(jobId).then(res => {
           setStatusMessage(res.data.status);
+          setProgress({
+            totalDocuments: res.data.totalDocuments,
+            processedDocuments: res.data.processedDocuments,
+            estimatedTimeSeconds: res.data.estimatedTimeSeconds,
+          });
           if (res.data.status === 'Completed' || res.data.status === 'Failed') {
             clearInterval(interval);
             setIsTraining(false);
+            setProgress(null);
             fetchModelMetrics();
           }
         });
@@ -72,15 +84,15 @@ export const TrainingModule: React.FC = () => {
   const fetchTrainingData = async () => {
     try {
       const res = await getTrainingData();
-        setTrainingData(
-          res.data.map((item: any) => ({
-            id: item.id,
-            filename: item.fileName || item.filename, // support both
-            label: item.label,
-            confidence: item.confidence,
-            status: (item.status || '').toLowerCase(), // normalize status
-          }))
-        );
+      setTrainingData(
+        res.data.map((item: any) => ({
+          id: item.id,
+          filename: item.fileName || item.filename, // support both
+          label: item.label,
+          confidence: item.confidence,
+          status: (item.status || '').toLowerCase(), // normalize status
+        }))
+      );
     } catch (err) {
       // handle error
     }
@@ -146,6 +158,12 @@ export const TrainingModule: React.FC = () => {
       setIsTraining(false);
       // handle error
     }
+  };
+
+  const getConfidenceColor = (confidence: number) => {
+    if (confidence >= 95) return 'text-green-600';
+    if (confidence >= 85) return 'text-yellow-600';
+    return 'text-red-600';
   };
 
   const addNewLabel = () => {
@@ -293,7 +311,11 @@ export const TrainingModule: React.FC = () => {
                 <Upload className="w-4 h-4" />
                 <span>Choose File</span>
               </label>
-              <div className="mt-2 flex items-center space-x-2">
+
+            </div>
+            {file && file.name && (
+              <div className="mt-2 flex justify-center items-center space-x-2">
+                <span className="text-xs text-gray-600">{file.name}</span>
                 <select
                   value={label}
                   onChange={e => setLabel(e.target.value)}
@@ -310,9 +332,9 @@ export const TrainingModule: React.FC = () => {
                 >
                   {uploading ? 'Uploading...' : 'Upload'}
                 </button>
-                {file && <span className="text-xs text-gray-600">{file.name}</span>}
               </div>
-            </div>
+            )}
+
           </div>
         </div>
 
@@ -376,9 +398,23 @@ export const TrainingModule: React.FC = () => {
                 <span className="font-medium text-gray-900">Training in Progress</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-                <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full animate-pulse" style={{ width: '45%' }} />
+                <div
+                  className="bg-gradient-to-r from-blue-500 to-purple-600 h-2 rounded-full animate-pulse"
+                  style={{ width: progress && progress.totalDocuments > 0 ? `${Math.round((progress.processedDocuments / progress.totalDocuments) * 100)}%` : '0%' }}
+                />
               </div>
-              <p className="text-sm text-gray-600">Epoch 3/10 - Estimated time: 2 minutes</p>
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>
+                  {progress
+                    ? `${progress.processedDocuments} / ${progress.totalDocuments} documents`
+                    : '--'}
+                </span>
+                <span>
+                  {progress && progress.estimatedTimeSeconds !== null
+                    ? `Estimated time: ${Math.ceil(progress.estimatedTimeSeconds / 60)} min`
+                    : ''}
+                </span>
+              </div>
             </div>
           )}
         </div>

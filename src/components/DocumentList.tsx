@@ -9,7 +9,8 @@ import {
   Calendar,
   Tag,
   SortAsc,
-  MoreVertical
+  MoreVertical,
+  X
 } from 'lucide-react';
 
 interface Document {
@@ -34,6 +35,9 @@ export const DocumentList: React.FC = () => {
   const [isDocumentsLoading, setIsDocumentsLoading] = useState(true);
   const [documentsError, setDocumentsError] = useState<string | null>(null);
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+  const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchDocuments = async () => {
@@ -113,6 +117,41 @@ export const DocumentList: React.FC = () => {
     if (confidence >= 95) return 'text-green-600';
     if (confidence >= 85) return 'text-yellow-600';
     return 'text-red-600';
+  };
+
+  // Download document handler
+  const handleDownload = async (doc: Document) => {
+    try {
+      const response = await fetch(`${apiBaseUrl}/documents/${doc.id}/download`);
+      if (!response.ok) throw new Error('Failed to download');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = doc.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      alert('Download failed');
+    }
+  };
+
+  // Delete document handler
+  const handleDelete = async (doc: Document) => {
+    if (!window.confirm(`Delete document "${doc.name}"?`)) return;
+    setDeletingId(doc.id);
+    try {
+      const response = await fetch(`${apiBaseUrl}/documents/${doc.id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Failed to delete');
+      setDocuments(prev => prev.filter(d => d.id !== doc.id));
+      setOpenMenuId(null);
+    } catch (err) {
+      alert('Delete failed');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -248,15 +287,29 @@ export const DocumentList: React.FC = () => {
                 <div className="flex items-center space-x-3">
                   {getStatusBadge(doc.status)}
                   <div className="flex items-center space-x-2">
-                    <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Preview">
+                    <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Preview" onClick={() => setPreviewDoc(doc)}>
                       <Eye className="w-4 h-4 text-gray-500" />
                     </button>
-                    <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Download">
+                    <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="Download" onClick={() => handleDownload(doc)}>
                       <Download className="w-4 h-4 text-gray-500" />
                     </button>
-                    <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="More options">
-                      <MoreVertical className="w-4 h-4 text-gray-500" />
-                    </button>
+                    <div className="relative">
+                      <button className="p-2 hover:bg-gray-100 rounded-lg transition-colors" title="More options" onClick={() => setOpenMenuId(openMenuId === doc.id ? null : doc.id)}>
+                        <MoreVertical className="w-4 h-4 text-gray-500" />
+                      </button>
+                      {openMenuId === doc.id && (
+                        <div className="absolute right-0 mt-2 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                          <button
+                            className="flex items-center w-full px-4 py-2 text-red-600 hover:bg-red-50"
+                            onClick={() => handleDelete(doc)}
+                            disabled={deletingId === doc.id}
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            {deletingId === doc.id ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -272,6 +325,23 @@ export const DocumentList: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Preview Modal */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 relative">
+            <button className="absolute top-3 right-3 p-1 rounded hover:bg-gray-200" onClick={() => setPreviewDoc(null)}>
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+            <h2 className="text-xl font-semibold mb-2">{previewDoc.name}</h2>
+            <div className="mb-2 text-sm text-gray-600">Type: {previewDoc.classification.predicted}</div>
+            <div className="mb-2 text-sm text-gray-600">Confidence: {previewDoc.classification.confidence}%</div>
+            <div className="mb-2 text-sm text-gray-600">Uploaded: {previewDoc.uploadDate.toLocaleDateString()}</div>
+            <div className="mb-2 text-sm text-gray-600">Size: {previewDoc.size}</div>
+            {/* Optionally, show more details or extracted text here */}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

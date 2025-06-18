@@ -56,6 +56,18 @@ public class TrainingJobDto
     /// Model evaluation metrics after training completes.
     /// </summary>
     public ModelMetricsDto? Metrics { get; set; }
+    /// <summary>
+    /// Total number of documents to be processed in this training job.
+    /// </summary>
+    public int TotalDocuments { get; set; }
+    /// <summary>
+    /// Number of documents processed so far in this training job.
+    /// </summary>
+    public int ProcessedDocuments { get; set; }
+    /// <summary>
+    /// Estimated time to complete the training job, in seconds.
+    /// </summary>
+    public double? EstimatedTimeSeconds { get; set; }
 }
 
 /// <summary>

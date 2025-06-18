@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("DocumentClassifier.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+9712cb9c5f7d8e2fe42f846ef1ea9f5a3d459dab")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+4fad0e1ea2a3fee3cd00b9cdf97e7ea9b6eb0136")]
 [assembly: System.Reflection.AssemblyProductAttribute("DocumentClassifier.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("DocumentClassifier.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
